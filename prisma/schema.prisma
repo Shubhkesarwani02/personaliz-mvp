@@ -1,0 +1,40 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model UserRequest {
+  id                 String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name               String       @db.VarChar(100)
+  city               String       @db.VarChar(100)
+  phone              String       @db.VarChar(20)
+  actorId            String       @map("actor_id") @db.VarChar(50)
+  status             String       @default("processing") @db.VarChar(50)
+  videoUrl           String?      @map("video_url") @db.Text
+  twilioMessageSid   String?      @map("twilio_message_sid") @db.VarChar(100)
+  createdAt          DateTime     @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt          DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  
+  logs RequestLog[]
+
+  @@map("user_requests")
+}
+
+model RequestLog {
+  id          String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  requestId   String      @map("request_id") @db.Uuid
+  event       String      @db.VarChar(50)
+  description String?     @db.Text
+  timestamp   DateTime    @default(now()) @db.Timestamp(6)
+  
+  request UserRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@map("request_logs")
+}

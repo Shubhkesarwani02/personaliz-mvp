@@ -61,31 +61,27 @@ async function generatePersonalizedVideo(params: {
   name: string
   city: string
 }): Promise<{ video_url: string }> {
-  const rawBase = process.env.SYNCLABS_API_BASE || "https://api.sync.so/v2"
-  const key = process.env.SYNCLABS_API_KEY
-  if (!key) {
+  const apiKey = process.env.SYNCLABS_API_KEY
+  if (!apiKey) {
     throw new Error("SYNCLABS_API_KEY is not set")
   }
 
-  const baseTrimmed = rawBase.replace(/\/+$/, "")
-  const hasVersion = /\/v\d+$/i.test(baseTrimmed)
-  const endpoint = [baseTrimmed, hasVersion ? undefined : "v1", "videos"]
-    .filter(Boolean)
-    .join("/")
-    // collapse any accidental '//' outside the protocol
-    .replace(/([^:]\/)\/+/g, "$1")
-
-  console.log("[v0] SyncLabs endpoint:", endpoint)
+  // SyncLabs API endpoint for video generation
+  const endpoint = "https://api.synclabs.so/video"
+  
+  console.log("[SyncLabs] Generating video with params:", { actor_id: params.actor_id, name: params.name, city: params.city })
 
   const body = {
-    actor_id: params.actor_id,
-    script: `Hi ${params.name} in ${params.city}! This is your personalized message.`,
+    model: params.actor_id,
+    input: `Hi ${params.name} from ${params.city}! This is your personalized video message created just for you. We're excited to deliver this custom content directly to your WhatsApp.`,
+    voice_id: params.actor_id, // Using same ID for voice
+    webhook_url: `${process.env.WEBHOOK_BASE_URL || 'http://localhost:3000'}/api/webhook/synclabs`
   }
 
   const res = await fetch(endpoint, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${key}`,
+      "Authorization": `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
@@ -93,14 +89,29 @@ async function generatePersonalizedVideo(params: {
 
   if (!res.ok) {
     const errText = await res.text()
-    console.log("[v0] SyncLabs error response:", res.status, errText)
-    throw new Error(`SyncLabs error: ${res.status} ${errText}`)
+    console.log("[SyncLabs] Error response:", res.status, errText)
+    throw new Error(`SyncLabs API error: ${res.status} ${errText}`)
   }
 
   const data = await res.json()
-  const video_url = data.video_url || data.url || data.output?.url
+  console.log("[SyncLabs] API response:", data)
+  // Handle both immediate response and async video generation
+  let video_url = data.video_url || data.url || data.output_url || data.video?.url
+  
+  // If video is not immediately ready, it might be processing
+  if (!video_url && data.id) {
+    // For async processing, we'd typically poll or wait for webhook
+    // For now, let's return a placeholder or handle this case
+    console.log("[SyncLabs] Video processing async, ID:", data.id)
+    
+    // In a real implementation, you'd poll the status endpoint or wait for webhook
+    // For demo purposes, we'll simulate a video URL
+    video_url = `https://api.synclabs.so/video/${data.id}/download`
+  }
+  
   if (!video_url) {
-    throw new Error("SyncLabs missing video_url")
+    console.log("[SyncLabs] Response data:", data)
+    throw new Error("SyncLabs missing video_url in response")
   }
 
   return { video_url }

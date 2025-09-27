@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Personaliz MVP API Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .success { background-color: #d4edda; }
+        .error { background-color: #f8d7da; }
+        .loading { background-color: #fff3cd; }
+        button { padding: 10px 15px; margin: 5px; cursor: pointer; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 3px; overflow-x: auto; }
+        input { padding: 5px; margin: 5px; min-width: 200px; }
+    </style>
+</head>
+<body>
+    <h1>🎥 Personaliz MVP - API Testing</h1>
+    <p>Test the personalized video generation and WhatsApp delivery functionality.</p>
+
+    <div class="test-section">
+        <h3>📝 Test Form</h3>
+        <div>
+            <input type="text" id="name" placeholder="Your Name" value="John Doe">
+            <input type="text" id="city" placeholder="Your City" value="San Francisco">
+            <input type="text" id="phone" placeholder="WhatsApp Number (+1234567890)" value="+1234567890">
+            <select id="actor">
+                <option value="actor_1">Sarah Chen - Business Coach</option>
+                <option value="actor_2">Marcus Johnson - Tech Leader</option>
+                <option value="actor_3">Elena Rodriguez - Marketing Expert</option>
+                <option value="demo_actor">Demo Actor - For Testing</option>
+            </select>
+        </div>
+        <button onclick="testVideoGeneration()">🎬 Generate Video</button>
+        <button onclick="clearResults()">🧹 Clear Results</button>
+    </div>
+
+    <div id="results" class="test-section" style="display: none;">
+        <h3>📊 Test Results</h3>
+        <div id="status"></div>
+        <pre id="response"></pre>
+        <div id="tracking" style="margin-top: 15px;"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>🧪 Quick API Tests</h3>
+        <button onclick="testHealthCheck()">Health Check</button>
+        <button onclick="testInvalidRequest()">Test Invalid Request</button>
+        <button onclick="testStatusEndpoint()">Test Status Endpoint</button>
+        <div id="quickResults" style="margin-top: 10px;"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>📋 Application Features</h3>
+        <ul>
+            <li>✅ <strong>Personalized Video Generation</strong> - SyncLabs API integration</li>
+            <li>✅ <strong>WhatsApp Delivery</strong> - Twilio WhatsApp Business API</li>
+            <li>✅ <strong>Real-time Status Tracking</strong> - Live updates via SWR</li>
+            <li>✅ <strong>Database Logging</strong> - Complete audit trail</li>
+            <li>✅ <strong>Webhook Support</strong> - Twilio delivery status</li>
+            <li>✅ <strong>Docker Support</strong> - Ready for production deployment</li>
+            <li>✅ <strong>Modern UI</strong> - Next.js + React + Tailwind CSS</li>
+            <li>✅ <strong>TypeScript</strong> - Full type safety</li>
+        </ul>
+    </div>
+
+    <script>
+        let currentRequestId = null;
+        let statusInterval = null;
+
+        async function testVideoGeneration() {
+            const name = document.getElementById('name').value;
+            const city = document.getElementById('city').value;
+            const phone = document.getElementById('phone').value;
+            const actor_id = document.getElementById('actor').value;
+
+            if (!name || !city || !phone) {
+                alert('Please fill in all fields');
+                return;
+            }
+
+            const resultsDiv = document.getElementById('results');
+            const statusDiv = document.getElementById('status');
+            const responseDiv = document.getElementById('response');
+
+            resultsDiv.style.display = 'block';
+            resultsDiv.className = 'test-section loading';
+            statusDiv.innerHTML = '🔄 Generating personalized video...';
+            responseDiv.textContent = '';
+
+            try {
+                const response = await fetch('/api/generate-video', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ name, city, phone, actor_id })
+                });
+
+                const data = await response.json();
+                responseDiv.textContent = JSON.stringify(data, null, 2);
+
+                if (response.ok) {
+                    resultsDiv.className = 'test-section success';
+                    statusDiv.innerHTML = '✅ Request submitted successfully!';
+                    currentRequestId = data.request_id;
+                    startStatusTracking(currentRequestId);
+                } else {
+                    resultsDiv.className = 'test-section error';
+                    statusDiv.innerHTML = '❌ Request failed: ' + (data.error || 'Unknown error');
+                }
+            } catch (error) {
+                resultsDiv.className = 'test-section error';
+                statusDiv.innerHTML = '❌ Network error: ' + error.message;
+                responseDiv.textContent = error.toString();
+            }
+        }
+
+        async function startStatusTracking(requestId) {
+            const trackingDiv = document.getElementById('tracking');
+            trackingDiv.innerHTML = '<h4>📡 Tracking Status...</h4>';
+
+            statusInterval = setInterval(async () => {
+                try {
+                    const response = await fetch(`/api/status/${requestId}`);
+                    const data = await response.json();
+                    
+                    if (response.ok) {
+                        const status = data.status;
+                        const logs = data.logs || [];
+                        
+                        let statusDisplay = `<strong>Status:</strong> ${status}<br>`;
+                        statusDisplay += `<strong>Video URL:</strong> ${data.video_url || 'Not ready'}<br>`;
+                        statusDisplay += `<strong>Twilio SID:</strong> ${data.twilio_message_sid || 'Not sent'}<br>`;
+                        
+                        if (logs.length > 0) {
+                            statusDisplay += '<br><strong>Timeline:</strong><ul>';
+                            logs.slice(-5).forEach(log => {
+                                statusDisplay += `<li>${log.description} (${new Date(log.timestamp).toLocaleTimeString()})</li>`;
+                            });
+                            statusDisplay += '</ul>';
+                        }
+                        
+                        trackingDiv.innerHTML = `<h4>📡 Live Status</h4>${statusDisplay}`;
+                        
+                        // Stop tracking if terminal status
+                        if (['delivered', 'read', 'failed'].includes(status)) {
+                            clearInterval(statusInterval);
+                            statusInterval = null;
+                        }
+                    }
+                } catch (error) {
+                    console.error('Status tracking error:', error);
+                }
+            }, 2000);
+        }
+
+        async function testHealthCheck() {
+            const quickResults = document.getElementById('quickResults');
+            quickResults.innerHTML = '🔄 Testing health check...';
+            
+            try {
+                const response = await fetch('/api/status/health-check');
+                const isHealthy = response.status === 404; // Expected for non-existent ID
+                quickResults.innerHTML = isHealthy ? 
+                    '✅ API is responding correctly (404 for invalid ID)' : 
+                    '⚠️ Unexpected response: ' + response.status;
+            } catch (error) {
+                quickResults.innerHTML = '❌ Health check failed: ' + error.message;
+            }
+        }
+
+        async function testInvalidRequest() {
+            const quickResults = document.getElementById('quickResults');
+            quickResults.innerHTML = '🔄 Testing invalid request...';
+            
+            try {
+                const response = await fetch('/api/generate-video', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ invalid: 'data' })
+                });
+                
+                const data = await response.json();
+                const isCorrectError = response.status === 400 && data.error;
+                quickResults.innerHTML = isCorrectError ?
+                    '✅ Validation working correctly (400 error for invalid data)' :
+                    '⚠️ Unexpected validation response';
+            } catch (error) {
+                quickResults.innerHTML = '❌ Invalid request test failed: ' + error.message;
+            }
+        }
+
+        async function testStatusEndpoint() {
+            const quickResults = document.getElementById('quickResults');
+            quickResults.innerHTML = '🔄 Testing status endpoint...';
+            
+            if (!currentRequestId) {
+                quickResults.innerHTML = '⚠️ No request ID available. Generate a video first.';
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/status/${currentRequestId}`);
+                const data = await response.json();
+                quickResults.innerHTML = response.ok ?
+                    `✅ Status endpoint working. Current status: ${data.status}` :
+                    '❌ Status endpoint error: ' + data.error;
+            } catch (error) {
+                quickResults.innerHTML = '❌ Status endpoint test failed: ' + error.message;
+            }
+        }
+
+        function clearResults() {
+            document.getElementById('results').style.display = 'none';
+            document.getElementById('quickResults').innerHTML = '';
+            if (statusInterval) {
+                clearInterval(statusInterval);
+                statusInterval = null;
+            }
+            currentRequestId = null;
+        }
+
+        // Show current URL info
+        document.addEventListener('DOMContentLoaded', () => {
+            const info = document.createElement('div');
+            info.className = 'test-section';
+            info.innerHTML = `
+                <h3>🔗 Application Info</h3>
+                <p><strong>Frontend:</strong> <a href="${window.location.origin}" target="_blank">${window.location.origin}</a></p>
+                <p><strong>API Base:</strong> ${window.location.origin}/api/</p>
+                <p><strong>Status:</strong> Server is running ✅</p>
+            `;
+            document.body.appendChild(info);
+        });
+    </script>
+</body>
+</html>
